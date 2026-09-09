@@ -1,3 +1,4 @@
+import sys
 from typing import Optional
 from pydantic import BaseModel, PositiveInt, Field
 
@@ -24,7 +25,7 @@ class ConfigParser:
     Attributes:
         config (Config): Instancia de la clase Config que contiene la configuración validada.
     """
-    def load_config(self, path: str) -> Config:
+    def load_config(path: str) -> Config:
         """Carga y valida la configuración del laberinto a partir de un archivo.
 
         Args:
@@ -33,6 +34,17 @@ class ConfigParser:
         Returns:
             Config: Instancia de la clase Config con la configuración validada.
         """
-        with open(path, "r") as f:
-            config_data = yaml.safe_load(f)
-        return Config(**config_data)
+        try:
+            with open(path, "r") as f:
+                config_dict = {}
+                for line in f:
+                    key, value = line.strip().split("=")
+                    config_dict[key] = eval(value)
+                conf = Config(**config_dict)
+                return conf
+        except OSError as e:
+            sys.stderr.write(f"Error al abrir el archivo de configuración: {e}\n")
+            raise
+        except Exception as e:
+            sys.stderr.write(f"Error al parsear la configuración: {e}\n")
+            raise
