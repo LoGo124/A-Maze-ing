@@ -59,7 +59,9 @@ class Cell():
         # Other flags
         self.visited = visited
         self.is_42_pattern = False
-        self.is_path = False
+        self.path: str | None = None
+        self.is_entry: bool = False
+        self.is_exit: bool = False
 
     @property
     def hex_cell(self) -> int:
@@ -84,6 +86,10 @@ class Cell():
         return (self.hex_cell == 15)
 
     @property
+    def is_path(self):
+        return (self.path is not None)
+
+    @property
     def neighbors(self):
         return [
             ("N", self.neighbor_n),
@@ -103,6 +109,10 @@ class Maze():
         ...
 
     def __init__(self, width: int = None, height: int = None, hex_grid: tuple = None) -> None:
+        self.entry: tuple[int, int] = None
+        self.exit: tuple[int, int] = None
+        self.path: list[str] = None
+
         if hex_grid is not None:
             self.width: int = len(hex_grid[0])
             self.height: int = len(hex_grid)
@@ -149,6 +159,33 @@ class Maze():
 
     def get_neighbors(self, cell: Cell) -> list[tuple[str, Cell]]:
         return cell.neighbors
+
+    def set_entry(self, x: int, y: int) -> None:
+        cell = self.get_cell(x, y)
+        if cell:
+            cell.is_entry = True
+            self.entry = (x, y)
+
+    def set_exit(self, x: int, y: int) -> None:
+        cell = self.get_cell(x, y)
+        if cell:
+            cell.is_exit = True
+            self.exit = (x, y)
+
+    def set_path(self, path: str) -> None:
+        self.path = path
+        coordinates = self.entry
+        for direction in path:
+            cell = self.get_cell(coordinates[0], coordinates[1])
+            cell.path = direction
+            if direction == "N":
+                coordinates = (coordinates[0], coordinates[1] - 1)
+            elif direction == "E":
+                coordinates = (coordinates[0] + 1, coordinates[1])
+            elif direction == "S":
+                coordinates = (coordinates[0], coordinates[1] + 1)
+            elif direction == "W":
+                coordinates = (coordinates[0] - 1, coordinates[1])
 
     def remove_wall(self, current: Cell, direction: str) -> None:
         if direction == "N":

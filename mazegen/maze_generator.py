@@ -1,16 +1,16 @@
 """ Recursive Backtracking """
-
 import random
 from typing import List
 from maze import Maze, Cell
+from config import Config
 
 
 class MazeGenerator:
     @staticmethod  # solo genera laberintos, no tiene info propia
-    def generate_perfect(start_xy: tuple[int, int] = (0, 0), seed: int = 42) -> Maze:
-        random.seed(seed)
+    def generate_perfect(conf: Config) -> Maze:
+        random.seed(conf.seed)
         maze = Maze(5,  5)
-        start_cell = maze.get_cell(start_xy[0], start_xy[1])
+        start_cell = maze.get_cell(conf.entry[0], conf.entry[1])
         stack = []
         start_cell.visited = True
         stack.append(start_cell)
@@ -29,12 +29,3 @@ class MazeGenerator:
             else:
                 stack.pop()
         return maze
-
-
-def run() -> None:
-    print(MazeGenerator.generate_perfect())
-    
-
-
-if __name__ == "__main__":
-    run()

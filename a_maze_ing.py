@@ -40,7 +40,7 @@ HEX_MAZE_25x20 = (
 )
 
 
-def menu_loop() -> None:
+def menu_loop(conf: Config) -> None:
     title = "="*5 + "A-maze-ing" + "="*5
     entries = [
         "\t1. Generate maze",
@@ -51,26 +51,39 @@ def menu_loop() -> None:
         "\t12. Load bad maze (8x8)",
         "\t13. Load empty maze (8x8)"
     ]
+    renderer: Renderer = Renderer({})
     while True:
         print(title)
         print("\n".join(entries))
         choice = input("Enter your choice: ")
-        if choice == "11":
-            maze: list[list[Cell]] = Maze(hex_grid=HEX_MAZE_25x20)
-            renderer: Renderer = Renderer({})
-            print(maze)
-            renderer.render(maze)
-        elif choice == "0":
+        if choice == "0":
             break
+        elif choice == "1":
+            ...
+        elif choice == "2":
+            renderer.conmutate_color_palette()
+        elif choice == "3":
+            ...
+        elif choice == "11":
+            maze: Maze = Maze(hex_grid=HEX_MAZE_25x20)
+            maze.set_entry(1, 1)
+            maze.set_exit(19, 14)
+            maze.set_path("ESEENEEESSSEESESSESESSSSEEEEEESES")
+            print(maze)
+            renderer.render_maze(maze)
+        elif choice == "12":
+            maze: Maze = Maze(hex_grid=HEX_MAZE_8X8)
+            print(maze)
+            renderer.render_maze(maze)
+        elif choice == "13":
+            maze: Maze = Maze(width=8, height=8)
+            print(maze)
+            renderer.render_maze(maze)
         else:
             print("Invalid choice. Please try again.")
 
 
-def main() -> None:
-    path: str = sys.argv[1] if len(sys.argv) > 1 else "config.txt"
+if __name__ == "__main__":
+    path: str = sys.argv[1] if len(sys.argv) > 1 else "A-Maze-ing/config.txt"
     conf: Config = ConfigParser.load_config(path)
     menu_loop(conf)
-
-
-if __name__ == "__main__":
-    main()

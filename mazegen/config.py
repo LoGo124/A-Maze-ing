@@ -39,7 +39,10 @@ class ConfigParser:
                 config_dict = {}
                 for line in f:
                     key, value = line.strip().split("=")
-                    config_dict[key] = eval(value)
+                    config_dict[key.lower()] = value
+                    if key in ["ENTRY", "EXIT"]:
+                        x, y = map(int, value.split(","))
+                        config_dict[key.lower()] = (x, y)
                 conf = Config(**config_dict)
                 return conf
         except OSError as e:
