@@ -1,36 +1,6 @@
 """definition of the Cell and Maze classes"""
 from typing import overload
 
-HEX_CELL_TO_ANSI = {
-                0: "\033[38;5;91m██\033[0m",
-                1: "\033[38;5;54m██\033[0m",
-                2: "\033[38;5;34m██\033[0m",
-                3: "\033[38;5;91m██\033[0m",
-                4: "\033[38;5;92m██\033[0m",
-                5: "\033[38;5;54m██\033[0m",
-                6: "\033[38;5;54m██\033[0m",
-                7: "\033[38;5;34m██\033[0m",
-                8: "\033[38;5;91m██\033[0m",
-                9: "\033[38;5;92m██\033[0m",
-                10: "\033[38;5;54m██\033[0m",
-                11: "\033[38;5;54m██\033[0m",
-                12: "\033[38;5;34m██\033[0m",
-                13: "\033[38;5;54m██\033[0m",
-                14: "\033[38;5;91m██\033[0m",
-                15: "\033[38;5;92m██\033[0m",
-            }
-
-HEX_MAZE_8X8 = (
-        "93359336",
-        "C96C8324",
-        "36A5824C",
-        "C05934C3",
-        "9516A5A3",
-        "A36AC24C",
-        "9024C926",
-        "A336C336"
-    )
-
 
 class Cell():
     def __init__(
@@ -65,6 +35,11 @@ class Cell():
 
     @property
     def hex_cell(self) -> int:
+        """AI is creating summary for hex_cell
+
+        Returns:
+            int: [description]
+        """
         return (
             (self.north * 1)
             + (self.east * 2)
@@ -100,19 +75,34 @@ class Cell():
 
 
 class Maze():
+
     @overload
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        entry: tuple[int],
+        exit: tuple[int]
+    ) -> None:
         ...
 
     @overload
-    def __init__(self, hex_grid: tuple) -> None:
+    def __init__(
+        self,
+        hex_grid: tuple,
+        entry: tuple[int, int],
+        exit: tuple[int, int]
+    ) -> None:
         ...
 
-    def __init__(self, width: int = None, height: int = None, hex_grid: tuple = None) -> None:
-        self.entry: tuple[int, int] = None
-        self.exit: tuple[int, int] = None
-        self.path: list[str] = None
-
+    def __init__(
+            self,
+            width: int = None,
+            height: int = None,
+            entry: tuple[int] = None,
+            exit: tuple[int] = None,
+            hex_grid: tuple = None
+    ) -> None:
         if hex_grid is not None:
             self.width: int = len(hex_grid[0])
             self.height: int = len(hex_grid)
@@ -127,10 +117,13 @@ class Maze():
             self.height: int = height
             self.grid: list[list[Cell]] = [[
                 Cell(x, y)
-                for y in range(height)
-                ]
                 for x in range(width)
+                ]
+                for y in range(height)
             ]
+        self.path: list[str] = None
+        self.set_entry(*entry) if entry else None
+        self.set_exit(*exit) if exit else None
         self._bind_neighbors()
 
     def _bind_neighbors(self) -> None:
@@ -147,10 +140,48 @@ class Maze():
             for x in range(self.width):
                 maze_str += str(self.grid[y][x])
             maze_str += "\n"
+        maze_str += "\n"
+        maze_str += f"{self.entry[0]},{self.entry[1]}\n" if self.entry else ""
+        maze_str += f"{self.exit[0]},{self.exit[1]}\n" if self.exit else ""
+        maze_str += f"{self.path}\n" if self.path else ""
         return maze_str
 
     def __int__(self) -> int:
         return (self.height * self.width)
+
+    def save(self, path: str) -> None:
+        try:
+            with open(path, "w") as f:
+                f.write(str(self))
+        except OSError as e:
+            print(e)
+        except Exception as e:
+            print(e)
+
+    def load(path: str) -> Maze:
+        try:
+            with open(path, "r") as f:
+                hex_grid = []
+                line = f.readline()
+                while (line != "\n"):
+                    hex_grid.append(line[0:-1])
+                    line = f.readline()
+                line = f.readline()
+                line = line[0:-1]
+                entry = (int(val) for val in line.split(","))
+                line = f.readline()
+                line = line[0:-1]
+                exit = (int(val) for val in line.split(","))
+                line = f.readline()
+                exit_path = line[0:-1]
+            maze = Maze(hex_grid=hex_grid, entry=entry, exit=exit)
+            maze.set_path(exit_path)
+            return maze
+        except OSError as e:
+            print(e)
+        except Exception as e:
+            print(e)
+            raise Exception
 
     def get_cell(self, x: int, y: int):
         if 0 <= x < self.width and 0 <= y < self.height:

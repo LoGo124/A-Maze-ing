@@ -2,19 +2,9 @@
 import sys
 
 from mazegen.config import Config, ConfigParser
-from mazegen.maze import Maze, Cell
+from mazegen.maze import Maze
+from mazegen.maze_generator import MazeGenerator
 from mazegen.renerer import Renderer
-
-HEX_MAZE_8X8 = (
-        "93359336",
-        "C96C8324",
-        "36A5824C",
-        "C05934C3",
-        "9516A5A3",
-        "A36AC24C",
-        "9024C926",
-        "A336C336"
-    )
 
 HEX_MAZE_25x20 = (
     "9139551111555515515395153",
@@ -41,44 +31,30 @@ HEX_MAZE_25x20 = (
 
 
 def menu_loop(conf: Config) -> None:
-    title = "="*5 + "A-maze-ing" + "="*5
-    entries = [
-        "\t1. Generate maze",
-        "\t2. Change colors",
-        "\t3. Toggle animation",
-        "\t0. Exit",
-        "\t11. Load subject maze (25x20)",
-        "\t12. Load bad maze (8x8)",
-        "\t13. Load empty maze (8x8)"
-    ]
     renderer: Renderer = Renderer({})
+    is_animated: Renderer | bool = False
+    maze = MazeGenerator.generate_perfect(conf, renderer=is_animated)
     while True:
-        print(title)
-        print("\n".join(entries))
+        renderer.render(maze)
         choice = input("Enter your choice: ")
         if choice == "0":
             break
         elif choice == "1":
-            ...
+            conf.seed += 1
+            maze = MazeGenerator.generate_perfect(conf, renderer=is_animated)
         elif choice == "2":
             renderer.conmutate_color_palette()
         elif choice == "3":
-            ...
+            is_animated = renderer if not is_animated else False
+        elif choice == "4":
+            maze.save(conf.output_file)
+        elif choice == "5":
+            maze = Maze.load(conf.output_file)
         elif choice == "11":
-            maze: Maze = Maze(hex_grid=HEX_MAZE_25x20)
-            maze.set_entry(1, 1)
-            maze.set_exit(19, 14)
+            maze = Maze(hex_grid=HEX_MAZE_25x20, entry=(1, 1), exit=(19, 14))
             maze.set_path("ESEENEEESSSEESESSESESSSSEEEEEESES")
-            print(maze)
-            renderer.render_maze(maze)
         elif choice == "12":
-            maze: Maze = Maze(hex_grid=HEX_MAZE_8X8)
-            print(maze)
-            renderer.render_maze(maze)
-        elif choice == "13":
-            maze: Maze = Maze(width=8, height=8)
-            print(maze)
-            renderer.render_maze(maze)
+            maze = Maze(width=8, height=8, entry=(0, 0), exit=(7, 7))
         else:
             print("Invalid choice. Please try again.")
 
