@@ -1,49 +1,37 @@
-""" Recursive Backtracking """
 import random
-from time import sleep
-from abc import ABC, abstractmethod
 
-from .config import Config
 from .maze import Maze, Cell
-from .renerer import Renderer
 
 
-class MazeGenerator(ABC):
-    @abstractmethod
-    def generate(conf: Config, renderer: Renderer = None) -> Maze: ...
+class MazeGenerator():
+    def __init__(self, width: int, height: int, entry: tuple[int], exit: tuple[int], perfect: bool, seed: int = 42):
+        self.width = width
+        self.height = height
+        self.entry = entry
+        self.exit = exit
+        self.perfect = perfect
+        self.seed = seed
 
-    def solve_maze(maze: Maze, renderer: Renderer = None) -> str:
-        """ BFS (Breadth-First Search) """
-        queue: list[tuple[Cell, str]] = [(maze.entry, "")]
-        maze.reset_visited()
-        maze.entry.visited = True
+    def generate(self) -> Maze:
+        self.seed += 1
+        if self.perfect:
+            for maze in self._generate_backtracking():
+                yield maze
+            for maze in self.solve_maze(maze):
+                yield maze
+        else:
+            for maze in self._generate_prim():
+                yield maze
+            for maze in self.handle_dead_ends(maze):
+                yield maze
+            for maze in self.solve_maze(maze):
+                yield maze
+        return
 
-        while queue:
-            cell, path = queue.pop(0)
-            if cell.is_exit:
-                maze.set_path(path)
-                if renderer:
-                    renderer.reset_terminal()
-                    renderer.render_maze(maze)
-                    sleep(1/10)
-                return path
-            for dir, neighbor in cell.neighbors:
-                if neighbor and not neighbor.visited and not cell.has_wall_on(dir):
-                    neighbor.visited = True
-                    queue.append((neighbor, path + dir))
-                    if renderer:
-                        maze.set_path(path)
-                        renderer.reset_terminal()
-                        renderer.render_maze(maze)
-                        sleep(1/10)
-
-
-class PerfectMazeGen(MazeGenerator):
-    @staticmethod  # solo genera laberintos, no tiene info propia
-    def generate(conf: Config, renderer: Renderer = None) -> Maze:
-        random.seed(conf.seed)
-        maze = Maze(conf.width,  conf.height, conf.entry, conf.exit)
-        start_cell = maze.get_cell(*conf.entry)
+    def _generate_backtracking(self) -> Maze:
+        random.seed(self.seed)
+        maze = Maze(self.width,  self.height, self.entry, self.exit)
+        start_cell = maze.get_cell(*self.entry)
         stack = []
         start_cell.visited = True
         stack.append(start_cell)
@@ -54,25 +42,19 @@ class PerfectMazeGen(MazeGenerator):
                 if neighbor and not neighbor.visited:
                     unvisited.append((direction, neighbor))
             if unvisited:
-                if renderer:
-                    renderer.reset_terminal()
-                    renderer.render_maze(maze)
-                    sleep(1/45)
                 direction, next_cell = random.choice(unvisited)
                 maze.remove_wall(current, direction)
                 next_cell.visited = True
                 stack.append(next_cell)
+                yield maze
             else:
                 stack.pop()
-        return maze
+        return
 
-
-class PacManMazeGen(MazeGenerator):
-    @staticmethod
-    def generate(conf: Config, renderer: Renderer = None) -> Maze:
-        random.seed(conf.seed)
-        maze = Maze(conf.width, conf.height, conf.entry, conf.exit)
-        start_cell = maze.get_cell(*conf.entry)
+    def _generate_prim(self) -> Maze:
+        random.seed(self.seed)
+        maze = Maze(self.width, self.height, self.entry, self.exit)
+        start_cell = maze.get_cell(*self.entry)
         start_cell.visited = True
         frontier: list[tuple[Cell, str, Cell]] = []
         for direction, neighbor in start_cell.neighbors:
@@ -82,13 +64,46 @@ class PacManMazeGen(MazeGenerator):
             current, direction, next_cell = random.choice(frontier)
             frontier.remove((current, direction, next_cell))
             if not next_cell.visited:
-                if renderer:
-                    renderer.reset_terminal()
-                    renderer.render_maze(maze)
-                    sleep(1/45)
                 maze.remove_wall(current, direction)
                 next_cell.visited = True
+                yield maze
                 for dir2, neighbor2 in next_cell.neighbors:
                     if neighbor2 and not neighbor2.visited:
                         frontier.append((next_cell, dir2, neighbor2))
-        return maze
+        return
+
+    def solve_maze(self, maze: Maze) -> Maze:
+        """ BFS (Breadth-First Search) """
+        queue: list[tuple[Cell, str]] = [(maze.entry, "")]
+        maze.reset_visited()
+        maze.entry.visited = True
+
+        while queue:
+            cell, path = queue.pop(0)
+            if cell.is_exit:
+                maze.set_path(path)
+                return
+            for dir, neighbor in cell.neighbors:
+                if neighbor and not neighbor.visited and not cell.has_wall_on(dir):
+                    neighbor.visited = True
+                    queue.append((neighbor, path + dir))
+                    maze.set_path(path + dir)
+                    yield maze
+
+    def handle_dead_ends(self, maze: Maze) -> Maze:
+        dead_end_cells = [cell for cell in maze if cell.is_dead_end]
+        for cell in dead_end_cells:
+            while cell.is_dead_end and not cell.is_42_dead_end:
+                for dir, neighbour in cell.neighbors:
+                    if neighbour and neighbour.is_dead_end:
+                        maze.remove_wall(cell, dir)
+                        yield maze
+                        break
+                if not cell.is_dead_end:
+                    continue
+                for dir, neighbour in cell.neighbors:
+                    if neighbour and not neighbour.is_42 and cell.has_wall_on(dir):
+                        maze.remove_wall(cell, dir)
+                        yield maze
+                        break
+        return

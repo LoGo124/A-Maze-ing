@@ -1,13 +1,14 @@
 """definition of the Cell and Maze classes"""
-from typing import overload
+from typing import overload, Any
 from sys import stderr
+
 
 class Cell():
     def __init__(
             self,
             x: int,
             y: int,
-            hex_cell: int = 15,
+            hex_val: int = 15,
             visited: bool = False
             ):
         # Coordinates
@@ -15,10 +16,10 @@ class Cell():
         self.y = y
 
         # Walls
-        self.north: bool = hex_cell & 1 == 1
-        self.east: bool = hex_cell & 2 == 2
-        self.south: bool = hex_cell & 4 == 4
-        self.west: bool = hex_cell & 8 == 8
+        self.north: bool = hex_val & 1 == 1
+        self.east: bool = hex_val & 2 == 2
+        self.south: bool = hex_val & 4 == 4
+        self.west: bool = hex_val & 8 == 8
 
         # Neighbours
         self.neighbor_n: Cell = None
@@ -34,8 +35,8 @@ class Cell():
         self.is_exit: bool = False
 
     @property
-    def hex_cell(self) -> int:
-        """AI is creating summary for hex_cell
+    def hex_val(self) -> int:
+        """AI is creating summary for hex_val
 
         Returns:
             int: [description]
@@ -47,31 +48,43 @@ class Cell():
             + (self.west * 8)
             )
 
-    def __int__(self):
-        return self.hex_cell
+    @property
+    def is_dead_end(self):
+        dead_end_values = [14, 13, 11, 7]
+        return self.hex_val in dead_end_values
 
-    def __hex__(self):
-        return f"{hex(self.hex_cell)}"
-
-    def __str__(self):
-        return (hex(int(self))[-1])
+    @property
+    def is_42_dead_end(self) -> bool:
+        surrounding_42_cells: int = 0
+        for _, neighbor in self.neighbors:
+            surrounding_42_cells += 1 if neighbor and neighbor.is_42 else 0
+        return (surrounding_42_cells == 3 and self.is_dead_end)
 
     @property
     def is_closed(self):
-        return (self.hex_cell == 15)
+        return (self.hex_val == 15)
 
     @property
     def is_path(self):
         return (self.path is not None)
 
     @property
-    def neighbors(self):
+    def neighbors(self) -> tuple[str, Any]:
         return [
             ("N", self.neighbor_n),
             ("E", self.neighbor_e),
             ("S", self.neighbor_s),
             ("W", self.neighbor_w)
             ]
+
+    def __int__(self):
+        return self.hex_val
+
+    def __hex__(self):
+        return f"{hex(self.hex_val)}"
+
+    def __str__(self):
+        return (hex(int(self))[-1])
 
     def has_wall_on(self, direction: str):
         if direction.upper() == "N":
@@ -83,12 +96,12 @@ class Cell():
         if direction.upper() == "W":
             return self.west
 
-    def set_hex_cell(self, hex_cell: int = 15):
+    def set_hex_val(self, hex_val: int = 15):
         # Walls
-        self.north: bool = hex_cell & 1 == 1
-        self.east: bool = hex_cell & 2 == 2
-        self.south: bool = hex_cell & 4 == 4
-        self.west: bool = hex_cell & 8 == 8
+        self.north: bool = hex_val & 1 == 1
+        self.east: bool = hex_val & 2 == 2
+        self.south: bool = hex_val & 4 == 4
+        self.west: bool = hex_val & 8 == 8
 
 
 class Maze():
@@ -124,8 +137,8 @@ class Maze():
             self.width: int = len(hex_grid[0])
             self.height: int = len(hex_grid)
             self.grid: list[list[Cell]] = [[
-                Cell(x, y, int(hex_cell, 16))
-                for x, hex_cell in enumerate(row)
+                Cell(x, y, int(hex_val, 16))
+                for x, hex_val in enumerate(row)
                 ]
                 for y, row in enumerate(hex_grid)
                 ]
@@ -142,10 +155,12 @@ class Maze():
         self.exit: Cell = None
         self.path: list[str] = None
         self.warnings: list[Exception] = []
+        if entry == exit and isinstance(entry, tuple):
+            self.warnings.append(ValueError(f"Entry and exit coordinates should be different, both values are set to: {entry}"))
+        self._set_pattern()
         self.set_entry(*entry) if entry else None
         self.set_exit(*exit) if exit else None
         self._bind_neighbors()
-        self._set_pattern()
 
     def __str__(self) -> str:
         maze_str = ""
@@ -161,6 +176,19 @@ class Maze():
 
     def __int__(self) -> int:
         return (self.height * self.width)
+
+    def __iter__(self):
+        self._i = 0
+        return self
+
+    def __next__(self) -> Cell:
+        y = self._i // len(self.grid[0])
+        x = self._i % len(self.grid[0])
+        if x == 0 and y >= len(self.grid):
+            raise StopIteration
+        current_cell = self.grid[y][x]
+        self._i += 1
+        return current_cell
 
     def _bind_neighbors(self) -> None:
         for row in self.grid:

@@ -1,7 +1,7 @@
 from typing import List
 from sys import stderr
 
-from .maze import Maze, Cell
+from mazegen import Maze, Cell
 
 
 class Renderer:
@@ -70,7 +70,6 @@ class Renderer:
             "\t8.\tSave maze",
             "\t9.\tLoad maze",
             "\t0.\tExit",
-            "\t11.\tLoad subject maze (25x20)"
         ]
         print(title)
         print("\n".join(entries))
@@ -129,8 +128,10 @@ class Renderer:
         return cell_strs
 
     def render_warnings(self, maze: Maze) -> None:
-        for error in maze.warnings:
-            stderr.write(str(error))
+        if maze.warnings:
+            for error in maze.warnings:
+                stderr.write("\033[38;5;1m \033[48;5;1m WARNING: " + str(error) + "\033[0m\n")
+            print()
 
     def render_maze(self, maze: Maze) -> None:
         maze_strs: List[str] = []
@@ -145,7 +146,7 @@ class Renderer:
                 if y == maze.height - 1:
                     maze_strs[y*2+2] += cell_strs[2]
         maze_str = "\n".join(maze_strs)
-        print(maze_str)
+        print(maze_str, end="\n"*2)
 
     def render(self, maze: Maze) -> None:
         self.reset_terminal()

@@ -1,6 +1,12 @@
 import sys
 from typing import Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ValidationError, Field, model_validator
+
+
+class ConfigSyntaxError(ValidationError):
+    def __init__(self, *args):
+        valid_configs = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE", "PERFECT", "SEED"]
+        super().__init__(f"Valid config.txt syntax: key=value\nValid keys: {valid_configs}", *args)
 
 
 class Config(BaseModel):
@@ -15,14 +21,13 @@ class Config(BaseModel):
     entry: tuple[int, int] = Field(..., description="Coordenadas de entrada del laberinto (x, y).")
     exit: tuple[int, int] = Field(..., description="Coordenadas de salida del laberinto (x, y).")
     output_file: str = Field(..., description="Nombre del archivo de salida donde se guardará el laberinto generado.")
-    perfect: bool = Field(..., description="Indica si el laberinto debe ser perfecto (sin bucles) o no.")
-    seed: Optional[int] = Field(..., description="Semilla opcional para la generación del laberinto (si se proporciona, el laberinto será reproducible).")
+    perfect: Optional[bool] = Field(..., description="Indica si el laberinto debe ser perfecto (sin bucles) o no.")
+    seed: Optional[int] = None
 
     def _validate_coordinate(self, x: int, y: int) -> tuple[int, int]:
         x = min(x, self.width - 1) if x > 0 else 0
         y = min(y, self.height - 1) if y > 0 else 0
         return (x, y)
-
 
     @model_validator(mode='after')
     def validate_config(self):
@@ -48,18 +53,28 @@ class ConfigParser:
         """
         try:
             with open(path, "r") as f:
+                valid_configs = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE", "PERFECT", "SEED"]
                 config_dict = {}
                 for line in f:
+                    if line[0] == "#":
+                        continue
+                    elif not ("=" in line):
+                        raise ConfigSyntaxError()
                     key, value = line.strip().split("=")
-                    config_dict[key.lower()] = value
-                    if key in ["ENTRY", "EXIT"]:
-                        x, y = map(int, value.split(","))
-                        config_dict[key.lower()] = (x, y)
+                    if key.upper() in valid_configs:
+                        config_dict[key.lower()] = value
+                        if key in ["ENTRY", "EXIT"]:
+                            x, y = map(int, value.split(","))
+                            config_dict[key.lower()] = (x, y)
+                    else:
+                        raise ConfigSyntaxError()
                 conf = Config(**config_dict)
                 return conf
         except OSError as e:
-            sys.stderr.write(f"Error al abrir el archivo de configuración: {e}\n")
-            raise
+            sys.stderr.write(f"Error al abrir el archivo de configuración: \n{e}\n")
+        except ConfigSyntaxError as e:
+            sys.stderr.write(f"Error al parsear la configuración: \n{e}\n")
+        except ValidationError as e:
+            sys.stderr.write(f"Pydantic validation error: \n{e}\n")
         except Exception as e:
-            sys.stderr.write(f"Error al parsear la configuración: {e}\n")
-            raise
+            sys.stderr.write(f"Unknown error: \n{e}\n")
