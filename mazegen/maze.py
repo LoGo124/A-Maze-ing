@@ -190,6 +190,11 @@ class Maze():
         self._i += 1
         return current_cell
 
+    def _coordinate_correction(self, x: int, y: int) -> tuple[int, int]:
+        x = min(x, self.width - 1) if x > 0 else 0
+        y = min(y, self.height - 1) if y > 0 else 0
+        return (x, y)
+
     def _bind_neighbors(self) -> None:
         for row in self.grid:
             for cell in row:
@@ -210,7 +215,7 @@ class Maze():
         ]
         if self.width < 9 or self.height < 7:
             self.warnings.append(
-                ValueError("Error: Maze is too small to fit the '42' pattern.")
+                ValueError("Maze is too small to fit the '42' pattern.")
                 )
             return
 
@@ -264,13 +269,39 @@ class Maze():
         return cell.neighbors
 
     def set_entry(self, x: int, y: int) -> None:
+        if (x, y) != self._coordinate_correction(x, y):
+            self.warnings.append(
+                ValueError(f"Entry cell coordinates ({x}, {y}), are out of bounds. They have been corrected to {self._coordinate_correction(x, y)}.")
+                )
+            x, y = self._coordinate_correction(x, y)
         cell = self.get_cell(x, y)
+        if cell.is_42:
+            cell.is_42 = False
+            cell.visited = False
+            self.warnings.append(
+                ValueError(f"Entry cell ({x}, {y}) is part of the '42' pattern. This will break the pattern and may cause issues in the maze generation process.")
+                )
         if cell:
             cell.is_entry = True
             self.entry = cell
 
     def set_exit(self, x: int, y: int) -> None:
+        if (x, y) != self._coordinate_correction(x, y):
+            self.warnings.append(
+                ValueError(f"Exit cell coordinates ({x}, {y}), are out of bounds. They have been corrected to {self._coordinate_correction(x, y)}.")
+                )
+            x, y = self._coordinate_correction(x, y)
         cell = self.get_cell(x, y)
+        if cell.is_42:
+            cell.is_42 = False
+            cell.visited = False
+            self.warnings.append(
+                ValueError(f"Exit cell ({x}, {y}) is part of the '42' pattern. This will break the pattern and may cause issues in the maze generation process.")
+                )
+        if cell == self.entry:
+            self.warnings.append(
+                ValueError(f"Exit cell ({x}, {y}) is the same as the entry cell. This implies that the maze solution path is \"\" and there is no cell with is_path set to True.")
+                )
         if cell:
             cell.is_exit = True
             self.exit = cell

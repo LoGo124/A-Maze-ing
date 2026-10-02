@@ -1,6 +1,6 @@
 import sys
 from typing import Optional
-from pydantic import BaseModel, ValidationError, Field, model_validator
+from pydantic import BaseModel, ValidationError, Field
 
 
 class ConfigSyntaxError(ValidationError):
@@ -16,24 +16,13 @@ class Config(BaseModel):
         width (int): Ancho del laberinto.
         height (int): Altura del laberinto.
     """
-    width: int = Field(..., gt=6, lt=80, description="Ancho del laberinto (debe ser un entero positivo entre 7 y 79).")
-    height: int = Field(..., gt=6, lt=80, description="Altura del laberinto (debe ser un entero positivo entre 7 y 79).")
+    width: int = Field(..., gt=2, lt=80, description="Ancho del laberinto (debe ser un entero positivo entre 7 y 79).")
+    height: int = Field(..., gt=2, lt=80, description="Altura del laberinto (debe ser un entero positivo entre 7 y 79).")
     entry: tuple[int, int] = Field(..., description="Coordenadas de entrada del laberinto (x, y).")
     exit: tuple[int, int] = Field(..., description="Coordenadas de salida del laberinto (x, y).")
     output_file: str = Field(..., description="Nombre del archivo de salida donde se guardará el laberinto generado.")
     perfect: Optional[bool] = Field(..., description="Indica si el laberinto debe ser perfecto (sin bucles) o no.")
     seed: Optional[int] = None
-
-    def _validate_coordinate(self, x: int, y: int) -> tuple[int, int]:
-        x = min(x, self.width - 1) if x > 0 else 0
-        y = min(y, self.height - 1) if y > 0 else 0
-        return (x, y)
-
-    @model_validator(mode='after')
-    def validate_config(self):
-        self.entry = self._validate_coordinate(*self.entry)
-        self.exit = self._validate_coordinate(*self.exit)
-        return self
 
 
 class ConfigParser:
