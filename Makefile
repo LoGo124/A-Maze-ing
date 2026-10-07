@@ -19,12 +19,12 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -r {} +
 
 lint:
-	$(PYTHON) -m flake8 .
-	$(PYTHON) -m mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	$(PYTHON) -m flake8 . --exclude=.venv
+	$(PYTHON) -m mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --strict --exclude '^\.venv/'
 
 lint-strict:
-	$(PYTHON) -m flake8 .
-	$(PYTHON) -m mypy . --strict
+	$(PYTHON) -m flake8 . --exclude=.venv
+	$(PYTHON) -m mypy . --strict --exclude '^\.venv/'
 
 venv: clean
 	$(PYTHON) -m venv .venv

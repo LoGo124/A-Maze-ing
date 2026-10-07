@@ -1,80 +1,170 @@
+"""Module for parsing and validating maze configuration files"""
+
 import sys
-from typing import Optional
-from pydantic import BaseModel, ValidationError, Field, model_validator
+
+from typing import Tuple, Dict, List
+
+from pydantic import BaseModel, Field, ValidationError
 
 
-class ConfigSyntaxError(ValidationError):
-    def __init__(self, *args):
-        valid_configs = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE", "PERFECT", "SEED"]
-        super().__init__(f"Valid config.txt syntax: key=value\nValid keys: {valid_configs}", *args)
+VALID_CONFIG_KEYS: List[str] = [
+    "WIDTH",
+    "HEIGHT",
+    "ENTRY",
+    "EXIT",
+    "OUTPUT_FILE",
+    "PERFECT",
+    "SEED",
+]
+
+
+class ConfigSyntaxError(Exception):
+    """Custom exception raised when config.txt has invalid syntax."""
+    def __init__(self, message: str = "") -> None:
+        valid_configs = VALID_CONFIG_KEYS
+        base_msg = (
+            "Valid config.txt syntax: key=value\n"
+            f"Valid keys: {valid_configs}"
+        )
+        full_message = f"{message}\n{base_msg}" if message else base_msg
+        super().__init__(full_message)
 
 
 class Config(BaseModel):
-    """Clase que representa la configuración del laberinto usando Pydantic para validación de datos.
+    """Class that represents the maze configuration using Pydantic
+    for data validation.
 
     Attributes:
-        width (int): Ancho del laberinto.
-        height (int): Altura del laberinto.
+        width (int): Width of the maze.
+        height (int): Height of the maze.
+        entry: The 0-indexed (x, y) coordinates of the entry point.
+        exit_point: The 0-indexed (x, y) coordinates of the exit point.
+        output_file: The path to the output file where the maze will be saved.
+        perfect: Whether the maze must be perfect (spanning tree) or looping.
     """
-    width: int = Field(..., gt=6, lt=80, description="Ancho del laberinto (debe ser un entero positivo entre 7 y 79).")
-    height: int = Field(..., gt=6, lt=80, description="Altura del laberinto (debe ser un entero positivo entre 7 y 79).")
-    entry: tuple[int, int] = Field(..., description="Coordenadas de entrada del laberinto (x, y).")
-    exit: tuple[int, int] = Field(..., description="Coordenadas de salida del laberinto (x, y).")
-    output_file: str = Field(..., description="Nombre del archivo de salida donde se guardará el laberinto generado.")
-    perfect: Optional[bool] = Field(..., description="Indica si el laberinto debe ser perfecto (sin bucles) o no.")
-    seed: Optional[int] = None
 
-    def _validate_coordinate(self, x: int, y: int) -> tuple[int, int]:
-        x = min(x, self.width - 1) if x > 0 else 0
-        y = min(y, self.height - 1) if y > 0 else 0
-        return (x, y)
-
-    @model_validator(mode='after')
-    def validate_config(self):
-        self.entry = self._validate_coordinate(*self.entry)
-        self.exit = self._validate_coordinate(*self.exit)
-        return self
+    width: int = Field(..., gt=2, le=80)
+    height: int = Field(..., gt=2, le=80)
+    entry: Tuple[int, int] = Field(...)
+    exit: Tuple[int, int] = Field(...)
+    output_file: str = Field(...)
+    perfect: bool = Field(...)
+    seed: int | None = None
 
 
 class ConfigParser:
-    """Clase que se encarga de parsear y validar la configuración del laberinto.
+    """Class responsible for parsing and validating the maze configuration.
 
     Attributes:
-        config (Config): Instancia de la clase Config que contiene la configuración validada.
+        config (Config): An instance of the Config class containing the
+            validated configuration..
     """
+
+    @staticmethod
     def load_config(path: str) -> Config:
-        """Carga y valida la configuración del laberinto a partir de un archivo.
+        """Load and validate the maze configuration from a file.
 
         Args:
-            path (str): Ruta al archivo de configuración.
+            path (str): Path to the configuration file.
 
         Returns:
-            Config: Instancia de la clase Config con la configuración validada.
+            Config: An instance of the Config class.
         """
+        raw_data: Dict[str, str] = {}
         try:
-            with open(path, "r") as f:
-                valid_configs = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "OUTPUT_FILE", "PERFECT", "SEED"]
-                config_dict = {}
-                for line in f:
-                    if line[0] == "#":
+            with open(path, "r", encoding="utf-8") as file:
+                for raw_line in file:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#"):
                         continue
-                    elif not ("=" in line):
-                        raise ConfigSyntaxError()
-                    key, value = line.strip().split("=")
-                    if key.upper() in valid_configs:
-                        config_dict[key.lower()] = value
-                        if key in ["ENTRY", "EXIT"]:
-                            x, y = map(int, value.split(","))
-                            config_dict[key.lower()] = (x, y)
-                    else:
-                        raise ConfigSyntaxError()
-                conf = Config(**config_dict)
-                return conf
+                    if "=" not in line:
+                        raise ConfigSyntaxError(f"Invalid line format: {line}")
+                    key_text, value = line.split("=", 1)
+                    key = key_text.strip().upper()
+                    value = value.strip()
+                    if key not in VALID_CONFIG_KEYS:
+                        raise ConfigSyntaxError(
+                            f"Caught invalid configuration key error: {key}"
+                        )
+                    if not key or not value:
+                        raise ConfigSyntaxError(
+                            f"{key}'s value cannot be empty."
+                        )
+                    if key in raw_data:
+                        raise ConfigSyntaxError(
+                            f"Duplicate key found: {key}"
+                        )
+                    raw_data[key] = value
+        except PermissionError as e:
+            sys.exit(f"\nPermission denied when opening file: {e}\n")
         except OSError as e:
-            sys.stderr.write(f"Error al abrir el archivo de configuración: \n{e}\n")
+            sys.exit(f"\nError opening the configuration file: {e}\n")
         except ConfigSyntaxError as e:
-            sys.stderr.write(f"Error al parsear la configuración: \n{e}\n")
+            sys.exit(f"\nError parsing configuration: {e}\n")
+
+        try:
+            # Mandatory keys check
+            mandatory: List[str] = ["WIDTH",
+                                    "HEIGHT",
+                                    "ENTRY",
+                                    "EXIT",
+                                    "OUTPUT_FILE",
+                                    "PERFECT"]
+            for key in mandatory:
+                if key not in raw_data:
+                    raise ConfigSyntaxError(f"Missing mandatory key: {key}")
+
+            # Data type conversion and validation
+            # Config construction will validate the Config class
+            entry = ConfigParser._parse_coordinates(raw_data["ENTRY"])
+            exit_coord = ConfigParser._parse_coordinates(raw_data["EXIT"])
+
+            width = int(raw_data["WIDTH"])
+            height = int(raw_data["HEIGHT"])
+            if raw_data["PERFECT"].lower() == "true":
+                perfect = True
+            elif raw_data["PERFECT"].lower() == "false":
+                perfect = False
+            else:
+                raise ConfigSyntaxError(
+                    "PERFECT must be True or False."
+                )
+            seed_value: int | None = None
+            if "SEED" in raw_data:
+                seed_value = int(raw_data["SEED"])
+
+            return Config(
+                        width=width,
+                        height=height,
+                        entry=entry,
+                        exit=exit_coord,
+                        output_file=raw_data["OUTPUT_FILE"],
+                        perfect=perfect,
+                        seed=seed_value,
+                    )
+
         except ValidationError as e:
-            sys.stderr.write(f"Pydantic validation error: \n{e}\n")
+            sys.exit(f"\nPydantic validation error: {e}\n")
+        except ConfigSyntaxError as e:
+            sys.exit(f"\nError parsing configuration: {e}\n")
+        except ValueError as e:
+            sys.exit(f"\nInvalid value in configuration: {e}\n")
         except Exception as e:
-            sys.stderr.write(f"Unknown error: \n{e}\n")
+            sys.exit(f"\nError parsing configuration: {e}\n")
+
+    @staticmethod
+    def _parse_coordinates(value: str) -> tuple[int, int]:
+        """Convert 'x,y' into a tuple of two integers."""
+
+        coords = value.split(",")
+        if len(coords) != 2:
+            raise ConfigSyntaxError(
+                f"Invalid coordinates: {value}"
+            )
+        try:
+            x = int(coords[0].strip())
+            y = int(coords[1].strip())
+            return (x, y)
+        except ValueError as e:
+            sys.stderr.write(f"\nInvalid coordinates: {value} Usage: x,y")
+            sys.exit(f"\nError parsing configuration: {e}\n")
